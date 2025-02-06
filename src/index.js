@@ -1,6 +1,6 @@
 require("dotenv").config({ path: ".env" });
 const http = require("http");
-const cors= require('cors')
+const cors = require("cors");
 const express = require("express");
 const mongoose = require("mongoose");
 
@@ -12,22 +12,28 @@ const app = express();
 const server = http.createServer(app);
 app.use(cookieParser());
 app.use(express.json());
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://zoctor-ai.vercel.app",
+];
+
 app.use(
   cors({
-    origin: true, // Allow all origins
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'options'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
-    exposedHeaders: [
-      'Content-Disposition',
-      'X-Auth-Token',
-      'Authorization',
-      'Set-Cookie',
-    ],
-  }),
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
 );
-app.options('*', cors());
 
+app.options("*", cors());
 
 mongoose
   .connect(process.env.mongoose_uri, {
