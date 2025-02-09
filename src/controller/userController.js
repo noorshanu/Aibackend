@@ -5,6 +5,7 @@ const pdfParse = require("pdf-parse");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 const Bottleneck = require("bottleneck");
+const verify = require("../model/verifyModel");
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -142,7 +143,7 @@ const register = async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({
+    const existingUser = await verify.findOne({
       $or: [{ email }, { username }],
     });
     if (existingUser) {
@@ -156,7 +157,7 @@ const register = async (req, res) => {
     const verificationToken = crypto.randomBytes(20).toString("hex");
 
     // Create and save the user
-    const newUser = new User({
+    const newUser = new verify({
       username,
       email,
       password, // Hash the password
@@ -166,7 +167,7 @@ const register = async (req, res) => {
       description,
       preferredLanguage,
       preferredContactMethod, // Save the preferred contact methods
-      verified: false,
+
       verificationToken,
     });
     await newUser.save();
@@ -209,13 +210,11 @@ const getUser = async (req, res) => {
       .json({ status: true, msg: "User fetched successfully", data });
   } catch (error) {
     console.error("Error fetching user:", error.message);
-    return res
-      .status(500)
-      .json({
-        status: false,
-        msg: "Internal Server Error",
-        error: error.message,
-      });
+    return res.status(500).json({
+      status: false,
+      msg: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
@@ -284,22 +283,25 @@ const emailVerify = async (req, res) => {
     console.log("Verification request:", req.query);
 
     // Find user by token and email
-    const user = await User.findOne({
+    const verifyDocument = await verify.findOne({
       verificationToken: token,
       email,
     });
 
-    if (!user) {
+    if (!verifyDocument) {
       return res
         .status(404)
         .json({ msg: "Invalid or expired verification token" });
     }
 
     // Mark user as verified
-    user.verified = true;
-    user.verificationToken = undefined; // Clear the token
-    await user.save();
-
+    const newUser = new User({
+      ...verifyDocument.toObject(),
+      verified: true,
+      verificationToken: undefined,
+    });
+    await newUser.save();
+    await verify.deleteOne({ _id: verifyDocument._id });
     return res.status(200).json({ msg: "Email verified successfully" });
   } catch (error) {
     console.error("Error verifying email:", error);
@@ -308,6 +310,7 @@ const emailVerify = async (req, res) => {
       .json({ msg: "Error verifying email", error: error.message });
   }
 };
+
 
 const sendVerificationEmail = async (username, email, verificationUrl) => {
   const emailData = {
@@ -324,10 +327,10 @@ const sendVerificationEmail = async (username, email, verificationUrl) => {
       </head>
       <body>
           <p>Hello ${username},</p>
-          <p>Thanks for signing up for Deelance.</p>
+          <p>Thanks for signing up for zoctorai.</p>
           <p>Please click the link below to verify your account:</p>
           <a href="${verificationUrl}">Verify your account</a>
-          <p>Cheers,<br/>The Deelance Team</p>
+          <p>Cheers,<br/>The zoctorai Team</p>
       </body>
       </html>
     `,
@@ -389,6 +392,7 @@ const loginUser = async (req, res) => {
   }
 };
 
+
 const logoutUser = async (req, res) => {
   try {
     // Step 1: Clear cookies to log out the user on the client side
@@ -426,8 +430,137 @@ const logoutUser = async (req, res) => {
   }
 };
 
+// const extractTextFromPDF = async (pdfBuffer) => {
+//   try {
+//     const data = await pdfParse(pdfBuffer);
+//     return data.text;
+//   } catch (error) {
+//     throw new Error(`Error extracting text from PDF: ${error.message}`);
+//   }
+// };
 
+// const { GoogleGenerativeAI } = require("@google/generative-ai");
 
+// const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY); // Set your API key in environment variables
+
+// const analyzeMedicalReport = async (pdfText) => {
+//   try {
+//     const model = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+//     const response = await model.generateContent(
+//       `A user uploaded a medical report. Analyze it and provide key observations and actionable recommendations in a clear, empathetic tone.\n\nReport Content:\n${pdfText}`
+//     );
+
+//     return response.response.text();
+//   } catch (error) {
+//     console.error("Error analyzing medical report with Gemini:", error.message);
+//     throw new Error("Failed to analyze medical report.");
+//   }
+// };
+
+// // Route handler to process file upload and analyze the medical report
+// const uploadFile = async (req, res) => {
+//   let pdfBuffer;
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No file uploaded" });
+//     }
+
+//     pdfBuffer = fs.readFileSync(req.file.path);
+
+//     // Extract text from the PDF
+//     const extractedText = await extractTextFromPDF(pdfBuffer);
+
+//     // Analyze the extracted text using Gemini
+//     const analysisResult = await analyzeMedicalReport(extractedText);
+
+//     // Respond with the analysis
+//     res.status(200).json({
+//       message: "Medical report analysis complete",
+//       analysis: analysisResult,
+//     });
+//   } catch (error) {
+//     console.error("Error processing PDF:", error.message);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     // Clean up the uploaded file if it exists
+//     if (req.file) {
+//       fs.unlinkSync(req.file.path);
+//     }
+//   }
+// };
+
+// const extractTextFromPDF = async (pdfBuffer) => {
+//   try {
+//     const data = await pdfParse(pdfBuffer);
+//     return data.text;
+//   } catch (error) {
+//     throw new Error("Error extracting text from PDF");
+//   }
+// };
+
+// // Helper function to call Gemini API for medical report analysis
+// const analyzeMedicalReport = async (pdfText) => {
+//   try {
+//     const response = await axios.post(
+//       "https://gemini.googleapis.com/v1/chat/completions", // Replace with the actual Gemini endpoint
+//       {
+//         model: "gemini-1.5-flash", // Update with the correct model name
+//         messages: [
+//           {
+//             role: "user",
+//             content: `A user uploaded a medical report. Analyze it and provide key observations and actionable recommendations in a clear, empathetic tone.\n\nReport Content:\n${pdfText}`,
+//           },
+//         ],
+//         max_tokens: 1000, // Adjust as needed
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${process.env.GOOGLE_API_KEY}`, // Ensure you have this in your environment variables
+//           "Content-Type": "application/json",
+//         },
+//       }
+//     );
+//     return response.data.choices[0].message.content; // Adjust if the Gemini response differs
+//   } catch (error) {
+//     console.error(
+//       "Error calling Gemini API:",
+//       error.response ? error.response.data : error.message
+//     );
+//     throw new Error("API call to Gemini failed");
+//   }
+// };
+
+// // Route handler to process file upload and analyze the medical report
+// const uploadFile = async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No file uploaded" });
+//     }
+
+//     const pdfBuffer = fs.readFileSync(req.file.path);
+
+//     // Extract text from the PDF
+//     const extractedText = await extractTextFromPDF(pdfBuffer);
+
+//     // Analyze the extracted text using Gemini
+//     const analysisResult = await analyzeMedicalReport(extractedText);
+
+//     // Respond with the analysis
+//     res.status(200).json({
+//       message: "Medical report analysis complete",
+//       analysis: analysisResult,
+//     });
+
+//     // Clean up the uploaded file
+//     fs.unlinkSync(req.file.path);
+//   } catch (error) {
+//     console.error("Error processing PDF:", error.message);
+//     res.status(500).json({ error: error.message });
+//   }
+// };
+
+// // Route handler to answer user questions based on the analysis
+//======================main code ===============================//
 const { PDFExtract } = require("pdf.js-extract");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -491,7 +624,6 @@ Ensure the response is clear, concise, and formatted using bullet points for eas
 **Report Content**:
 ${pdfText}
 `;
-
 
     const response = await model.generateContent(prompt);
 
@@ -583,6 +715,135 @@ const AskQuestion = async (req, res) => {
     });
   }
 };
+// const path = require("path");
+
+// const { PDFExtract } = require("pdf.js-extract");
+// const Tesseract = require("tesseract.js");
+// const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// const pdfExtract = new PDFExtract();
+// const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY); // Set your API key in environment variables
+
+// // Function to extract text from PDF using pdf.js-extract
+// const extractTextFromPDF = async (pdfBuffer) => {
+//   return new Promise((resolve, reject) => {
+//     pdfExtract.extractBuffer(pdfBuffer, {}, (err, data) => {
+//       if (err) {
+//         return reject(new Error(`Error extracting text from PDF: ${err.message}`));
+//       }
+
+//       // Combine text from all pages
+//       const extractedText = data.pages
+//         .map((page) => page.content.map((item) => item.str).join(" "))
+//         .join("\n");
+//       resolve(extractedText);
+//     });
+//   });
+// };
+
+// // Function to perform OCR on images using Tesseract.js
+// const performOCR = async (imagePath) => {
+//   try {
+//     const { data } = await Tesseract.recognize(imagePath, "eng", {
+//       logger: (info) => console.log(info), // Log progress
+//     });
+//     return data.text.trim();
+//   } catch (error) {
+//     throw new Error(`Error performing OCR: ${error.message}`);
+//   }
+// };
+
+// // Function to analyze medical report using AI model
+// const analyzeMedicalReport = async (pdfText) => {
+//   try {
+//     if (!pdfText || pdfText.trim() === "") {
+//       throw new Error("Extracted text is empty. Please provide a valid medical report.");
+//     }
+
+//     const prompt = `You are a medical report analyzer. Analyze the following medical report thoroughly and provide:
+// 1. A concise summary of key observations limited to 60 words.
+// 2. A detailed analysis of the patient's overall health based on the report.
+
+// **Report Content**:
+// ${pdfText}
+// `;
+
+//     const model = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+//     const response = await model.generateContent(prompt);
+
+//     // Validate the AI response structure
+//     if (!response || !response.response || typeof response.response.text !== "string") {
+//       throw new Error("Invalid response from AI model. Ensure the API key is valid and the model is accessible.");
+//     }
+
+//     const fullResponseText = response.response.text.trim();
+
+//     // Handle the AI's response structure
+//     let conciseSummary = "Summary not found.";
+//     let detailedAnalysis = "Detailed analysis not found.";
+
+//     if (fullResponseText.includes("\n\n")) {
+//       const [summary, ...analysisParts] = fullResponseText.split("\n\n");
+//       conciseSummary = summary.split(" ").slice(0, 60).join(" "); // Limit to 60 words
+//       detailedAnalysis = analysisParts.join("\n\n").trim();
+//     } else {
+//       // If no clear separation, assume the whole response is the analysis
+//       conciseSummary = fullResponseText.split(" ").slice(0, 60).join(" ");
+//       detailedAnalysis = fullResponseText;
+//     }
+
+//     return { conciseSummary, detailedAnalysis };
+//   } catch (error) {
+//     console.error("Error analyzing medical report with Gemini:", error.message);
+//     throw new Error("Failed to analyze medical report.");
+//   }
+// };
+
+// // Route handler to process file upload and analyze the medical report
+// const uploadFile = async (req, res) => {
+//   let filePath;
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No file uploaded" });
+//     }
+
+//     filePath = req.file.path;
+
+//     const fileType = path.extname(filePath).toLowerCase();
+
+//     let extractedText;
+
+//     // Check if the uploaded file is a PDF or an image
+//     if (fileType === ".pdf") {
+//       const pdfBuffer = fs.readFileSync(filePath);
+//       extractedText = await extractTextFromPDF(pdfBuffer);
+//     } else if ([".png", ".jpg", ".jpeg"].includes(fileType)) {
+//       // Perform OCR directly on the uploaded image
+//       extractedText = await performOCR(filePath);
+//     } else {
+//       return res.status(400).json({ message: "Unsupported file type. Please upload a PDF or image file." });
+//     }
+
+//     console.log("Extracted Text:", extractedText);
+
+//     // Analyze the extracted text using Gemini AI
+//     const { conciseSummary, detailedAnalysis } = await analyzeMedicalReport(extractedText);
+
+//     // Respond with both analyses
+//     res.status(200).json({
+//       message: "Medical report analysis complete",
+//       conciseSummary,
+//       detailedAnalysis,
+//     });
+//   } catch (error) {
+//     console.error("Error processing file:", error.message);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     // Clean up the uploaded file if it exists
+//     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+//   }
+// };
+
 
 module.exports = {
   emailVerify,

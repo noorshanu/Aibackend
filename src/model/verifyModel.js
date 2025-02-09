@@ -1,9 +1,7 @@
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const { jwtExpiresIn } = require("../constant");
 
-const userSchema = new mongoose.Schema({
+const verifySchema = new mongoose.Schema({
   firstName: { type: String, required: true, trim: true },
   lastName: { type: String, required: true, trim: true },
   phoneNumber: {
@@ -62,7 +60,11 @@ const userSchema = new mongoose.Schema({
   preferredContactMethod: { type: [String], required: true },
   preferredAppointmentTime: { type: String },
   dateOfBirth: { type: Date },
-
+  pdf: [
+    {
+      url: { type: String },
+    },
+  ],
   address: {
     street: { type: String },
     city: { type: String },
@@ -78,31 +80,5 @@ const userSchema = new mongoose.Schema({
 
   createdAt: { type: Date, default: Date.now },
 });
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
 
-  try {
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-  } catch (error) {
-    return next(error);
-  }
-});
-userSchema.methods.isPasswordCorrect = async function (password) {
-  return bcrypt.compare(password, this.password);
-};
-
-userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ user_id: this._id }, process.env.ACCESS_TOKEN_SECRET, {
-    expiresIn: "1h",
-  });
-};
-
-userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign({ user_id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: "7d",
-  });
-};
-
-const User = mongoose.model("User", userSchema);
-module.exports = User;
+module.exports = mongoose.model('verify',verifySchema);
