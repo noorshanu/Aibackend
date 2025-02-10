@@ -173,7 +173,7 @@ const register = async (req, res) => {
     await newUser.save();
 
     // Construct verification URL
-    const verificationUrl = `${process.env.FRONTEND_URL}/email-verify?token=${verificationToken}&email=${email}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/email-verify?token=${verificationToken}&email=${newUser.email}`;
     console.log(verificationUrl);
 
     // Send verification email
@@ -311,7 +311,6 @@ const emailVerify = async (req, res) => {
   }
 };
 
-
 const sendVerificationEmail = async (username, email, verificationUrl) => {
   const emailData = {
     from: "noreplyzoctorai@gmail.com",
@@ -391,7 +390,6 @@ const loginUser = async (req, res) => {
     res.status(500).json({ status: false, msg: "Internal server error" });
   }
 };
-
 
 const logoutUser = async (req, res) => {
   try {
@@ -843,7 +841,6 @@ const AskQuestion = async (req, res) => {
 //     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 //   }
 // };
-
 
 module.exports = {
   emailVerify,
