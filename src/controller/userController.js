@@ -385,6 +385,7 @@ const loginUser = async (req, res) => {
       msg: "Login successful",
       accessToken,
       userId: user._id,
+      firstName: user.firstName,
     });
   } catch (error) {
     console.error("Error during login:", error);
