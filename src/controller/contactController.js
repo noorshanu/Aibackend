@@ -89,7 +89,7 @@ const sendEmail = async (to, subject, htmlContent) => {
 // };
 const userContact = async (req, res) => {
   try {
-    let { Name, Email, subject, phoneNumber, Message } = req.body;
+    let { Name, Email, subject, phoneNumber, Message ,language} = req.body;
 
     // Trim values
     Name = Name.trim();
