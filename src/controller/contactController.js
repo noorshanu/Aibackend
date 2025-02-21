@@ -98,7 +98,7 @@ const userContact = async (req, res) => {
     Message = Message.trim();
 
     // Basic Validation
-    if (!Name || !Email || !subject || !phoneNumber || !Message || language) {
+    if (!Name || !Email || !subject || !phoneNumber || !Message || !language) {
       return res
         .status(400)
         .json({ status: false, msg: "All fields are required" });
