@@ -98,7 +98,7 @@ const userContact = async (req, res) => {
     Message = Message.trim();
 
     // Basic Validation
-    if (!Name || !Email || !subject || !phoneNumber || !Message) {
+    if (!Name || !Email || !subject || !phoneNumber || !Message || language) {
       return res
         .status(400)
         .json({ status: false, msg: "All fields are required" });
@@ -126,6 +126,7 @@ const userContact = async (req, res) => {
       subject,
       phoneNumber,
       Message,
+      language
     });
     await newContact.save();
 
@@ -133,28 +134,75 @@ const userContact = async (req, res) => {
     await sendEmail(
       Email,
       "Thank You for Contacting ZoctorAi!",
-      `<h3>Hello ${Name},</h3>
-      <p>Thank you for reaching out to us regarding "<strong>${subject}</strong>".</p>
-      <p>We have received your request and will get back to you as soon as possible.</p>
-      <p>For further inquiries, feel free to reply to this email.</p>
-      <br>
-      <p>Best Regards,</p>
-      <p><strong>ZoctorAi Support Team</strong></p>`
+      `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; background: #ffffff; margin: auto; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Logo -->
+          <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #005dff;">
+            <img src="https://zoctor-ai.vercel.app/images/logo.png" alt="ZoctorAi Logo" style="max-width: 150px;">
+            <h2 style="color: #333; margin-top: 10px;">Thank You for Contacting Us!</h2>
+          </div>
+    
+          <!-- Content -->
+          <div style="padding: 20px;">
+            <h3 style="color: #333;">Hello ${Name},</h3>
+            <p>Thank you for reaching out to us regarding "<strong>${subject}</strong>".</p>
+            <p>We have received your request and will get back to you as soon as possible.</p>
+            <p>For further inquiries, feel free to reply to this email.</p>
+          </div>
+    
+          <!-- Footer -->
+          <div style="text-align: center; font-size: 12px; color: #666; padding-top: 10px; border-top: 1px solid #ddd;">
+            <p>Best Regards,</p>
+            <p><strong>ZoctorAi Support Team</strong></p>
+            <p>© ${new Date().getFullYear()} ZoctorAi. All rights reserved.</p>
+          </div>
+    
+        </div>
+      </div>
+      `
     );
 
     // Send Email to Admin
     const adminEmail = "noreplyzoctorai@gmail.com"; // Replace with actual admin email
     await sendEmail(
       adminEmail,
-      "New Contact Request - ZoctorAi",
-      `<h3>New Contact Request Received</h3>
-      <p><strong>Name:</strong> ${Name}</p>
-      <p><strong>Email:</strong> ${Email}</p>
-      <p><strong>Subject:</strong> ${subject}</p>
-      <p><strong>Phone Number:</strong> ${phoneNumber}</p>
-      <p><strong>Message:</strong> ${Message}</p>
-      <br>
-      <p>Check your admin panel for more details.</p>`
+      `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; background: #ffffff; margin: auto; padding: 20px; border-radius: 8px; box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Logo -->
+          <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #005dff;">
+            <img src="https://zoctor-ai.vercel.app/images/logo.png" alt="ZoctorAi Logo" style="max-width: 150px;">
+            <h2 style="color: #333; margin-top: 10px;">New Contact Request</h2>
+          </div>
+    
+          <!-- Content -->
+          <div style="padding: 20px;">
+            <h3 style="color: #333; text-align: center;">Customer Details</h3>
+            <div style="background: #f8f8f8; padding: 15px; border-radius: 8px; margin-top: 10px;">
+              <p><strong style="color: #005dff;">Name:</strong> ${Name}</p>
+              <p><strong style="color: #005dff;">Email:</strong> ${Email}</p>
+              <p><strong style="color: #005dff;">Subject:</strong> ${subject}</p>
+              <p><strong style="color: #005dff;">Phone Number:</strong> ${phoneNumber}</p>
+              <p><strong style="color: #005dff;">Message:</strong> ${Message}</p>
+              <p><strong style="color: #005dff;">Language:</strong> ${language}</p>
+            </div>
+    
+            <p style="text-align: center; font-size: 14px; margin-top: 20px; color: #666;">
+              Please review the customer's query.
+            </p>
+          </div>
+    
+          <!-- Footer -->
+          <div style="text-align: center; font-size: 12px; color: #666; padding-top: 10px; border-top: 1px solid #ddd;">
+            <p>© ${new Date().getFullYear()} ZoctorAi. All rights reserved.</p>
+          </div>
+    
+        </div>
+      </div>
+      `
     );
 
     res.status(200).json({
