@@ -637,6 +637,9 @@ ${pdfText}
 
 // Route handler to process file upload and analyze the medical report
 const uploadFile = async (req, res) => {
+  console.log("Incoming Request:", req.headers); // Debug request headers
+  console.log("Request Body:", req.body); // Debug request body
+  console.log("Uploaded File Details:", req.file); // Debugging uploaded file
   try {
     // 1️⃣ Check if the file exists
     if (!req.file) {
