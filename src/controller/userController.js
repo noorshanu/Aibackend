@@ -637,32 +637,51 @@ ${pdfText}
 
 // Route handler to process file upload and analyze the medical report
 const uploadFile = async (req, res) => {
-  let pdfBuffer;
   try {
+    // 1️⃣ Check if the file exists
     if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
+      return res.status(400).json({ error: "No file uploaded" });
     }
 
-    pdfBuffer = fs.readFileSync(req.file.path);
+    console.log("Uploaded file details:", req.file); // Debugging
 
-    // Extract text from the PDF
-    const extractedText = await extractTextFromPDF(pdfBuffer);
+    // 2️⃣ Read file from the path safely
+    const pdfBuffer = fs.readFileSync(req.file.path);
 
-    // Analyze the extracted text using Gemini
-    const analysisResult = await analyzeMedicalReport(extractedText);
+    // 3️⃣ Extract text from PDF
+    let extractedText;
+    try {
+      extractedText = await extractTextFromPDF(pdfBuffer);
+    } catch (extractError) {
+      console.error("PDF Extraction Failed:", extractError.message);
+      return res.status(500).json({ error: "Failed to extract text from PDF." });
+    }
 
-    // Respond with the analysis
+    // 4️⃣ Analyze the extracted text using Gemini API
+    let analysisResult;
+    try {
+      analysisResult = await analyzeMedicalReport(extractedText);
+    } catch (analysisError) {
+      console.error("AI Analysis Failed:", analysisError.message);
+      return res.status(500).json({ error: "Failed to analyze the medical report." });
+    }
+
+    // 5️⃣ Send response if everything is successful
     res.status(200).json({
       message: "Medical report analysis complete",
       analysis: analysisResult,
     });
   } catch (error) {
-    console.error("Error processing PDF:", error.message);
-    res.status(500).json({ error: error.message });
+    console.error("Unexpected Error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
   } finally {
-    // Clean up the uploaded file if it exists
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
+    // 6️⃣ Clean up uploaded file safely
+    if (req.file?.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error("File cleanup error:", cleanupError.message);
+      }
     }
   }
 };
