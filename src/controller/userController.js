@@ -223,7 +223,10 @@ const updateUser = async (req, res) => {
     const { userId } = req.params;
     const updates = req.body;
 
-    // Fields not allowed to be updated
+    console.log("🔍 Updating user:", userId);
+    console.log("📦 Received updates:", updates);
+
+    // Check if email or username is being updated (not allowed)
     if ("email" in updates || "username" in updates) {
       return res.status(400).json({
         status: false,
@@ -231,48 +234,45 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // Validate password and confirm password
-    if (updates.password) {
-      if (
-        !updates.confirmpassword ||
-        updates.password !== updates.confirmpassword
-      ) {
-        return res.status(400).json({
-          status: false,
-          msg: "Password and Confirm Password do not match",
-        });
-      }
+    // Validate userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.error("❌ Invalid userId format:", userId);
+      return res.status(400).json({ status: false, msg: "Invalid userId format" });
     }
 
-    // Find and update user
+    // Find user
     const user = await User.findById(userId);
     if (!user) {
+      console.error("❌ User not found:", userId);
       return res.status(404).json({ status: false, msg: "User not found" });
     }
 
-    // Update fields dynamically
+    // Update user fields dynamically
     Object.keys(updates).forEach((key) => {
       if (key !== "confirmpassword") {
         user[key] = updates[key];
       }
     });
 
-    // Save user (triggers `pre('save')` for password hashing if password is updated)
+    // Save user (triggers validation & hashing if needed)
     await user.save();
 
-    // Exclude sensitive fields from the response
+    // Exclude sensitive fields from response
     const { password, verificationToken, ...safeUser } = user.toObject();
 
+    console.log("✅ User updated successfully:", safeUser);
     return res.status(200).json({
       status: true,
       msg: "User updated successfully",
       data: safeUser,
     });
+
   } catch (error) {
-    console.error("Error during user update:", error);
+    console.error("🔥 ERROR UPDATING USER:", error.message, error.stack);
     return res.status(500).json({
       status: false,
       msg: "An error occurred while updating the user",
+      error: error.message, // Send detailed error message
     });
   }
 };
