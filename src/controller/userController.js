@@ -6,6 +6,7 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 const Bottleneck = require("bottleneck");
 const verify = require("../model/verifyModel");
+const mongoose = require("mongoose");  // ✅ Add this line
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
