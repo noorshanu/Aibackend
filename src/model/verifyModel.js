@@ -73,6 +73,17 @@ const verifySchema = new mongoose.Schema({
     country: { type: String },
   },
   verificationToken: { type: String },
+  IsthisWhatsappPhoneNumber: { type: Boolean },
+  willingForInternationalTreatment: { type: Boolean },
+  willingForMedicalTourism: { type: Boolean },
+  wantZoctorAICallback: { type: Boolean }, // New field
+  dateOfBirth: { type: Date },
+  gender: { type: String, enum: ["Male", "Female", "Other"] },
+  bloodType: {
+    type: String,
+    enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+  }, // ✅ New field: Blood Type
+  profilePicture: { type: String }, // ✅ New field: Profile Picture (URL or file path)
 
   subscribeNewsletter: { type: Boolean, default: false },
   consentToTerms: { type: Boolean }, //required: true },
@@ -81,4 +92,4 @@ const verifySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model('verify',verifySchema);
+module.exports = mongoose.model("verify", verifySchema);

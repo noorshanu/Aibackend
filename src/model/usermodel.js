@@ -71,6 +71,14 @@ const userSchema = new mongoose.Schema({
     country: { type: String },
   },
   verificationToken: { type: String },
+  IsthisWhatsappPhoneNumber: { type: Boolean },
+  willingForInternationalTreatment: { type: Boolean, }, // New field required: true
+  willingForMedicalTourism: { type: Boolean }, // New field
+  wantZoctorAICallback: { type: Boolean }, // New field
+  dateOfBirth: { type: Date }, // ✅ New field: Date of Birth
+  gender: { type: String, enum: ["Male", "Female", "Other"] }, // ✅ New field: Gender
+  bloodType: { type: String, enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] }, // ✅ New field: Blood Type
+  profilePicture: { type: String }, // ✅ New field: Profile Picture (URL or file path)
 
   subscribeNewsletter: { type: Boolean, default: false },
   consentToTerms: { type: Boolean }, //required: true },

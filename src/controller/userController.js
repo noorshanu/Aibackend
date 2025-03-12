@@ -637,54 +637,32 @@ ${pdfText}
 
 // Route handler to process file upload and analyze the medical report
 const uploadFile = async (req, res) => {
-  console.log("Incoming Request:", req.headers); // Debug request headers
-  console.log("Request Body:", req.body); // Debug request body
-  console.log("Uploaded File Details:", req.file); // Debugging uploaded file
+  let pdfBuffer;
   try {
-    // 1️⃣ Check if the file exists
     if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+      return res.status(400).json({ message: "No file uploaded" });
     }
 
-    console.log("Uploaded file details:", req.file); // Debugging
+    pdfBuffer = fs.readFileSync(req.file.path);
 
-    // 2️⃣ Read file from the path safely
-    const pdfBuffer = fs.readFileSync(req.file.path);
+    // Extract text from the PDF
+    const extractedText = await extractTextFromPDF(pdfBuffer);
 
-    // 3️⃣ Extract text from PDF
-    let extractedText;
-    try {
-      extractedText = await extractTextFromPDF(pdfBuffer);
-    } catch (extractError) {
-      console.error("PDF Extraction Failed:", extractError.message);
-      return res.status(500).json({ error: "Failed to extract text from PDF." });
-    }
+    // Analyze the extracted text using Gemini
+    const analysisResult = await analyzeMedicalReport(extractedText);
 
-    // 4️⃣ Analyze the extracted text using Gemini API
-    let analysisResult;
-    try {
-      analysisResult = await analyzeMedicalReport(extractedText);
-    } catch (analysisError) {
-      console.error("AI Analysis Failed:", analysisError.message);
-      return res.status(500).json({ error: "Failed to analyze the medical report." });
-    }
-
-    // 5️⃣ Send response if everything is successful
+    // Respond with the analysis
     res.status(200).json({
       message: "Medical report analysis complete",
       analysis: analysisResult,
     });
   } catch (error) {
-    console.error("Unexpected Error:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("Error processing PDF:", error.message);
+    res.status(500).json({ error: error.message });
   } finally {
-    // 6️⃣ Clean up uploaded file safely
-    if (req.file?.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error("File cleanup error:", cleanupError.message);
-      }
+    // Clean up the uploaded file if it exists
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
     }
   }
 };
@@ -866,6 +844,32 @@ const AskQuestion = async (req, res) => {
 //   }
 // };
 
+const profile= async (req, res) => {
+  try {
+    const { userId } = req.params
+    const updateFields = req.body;
+
+    // Restricted fields
+    // const restrictedFields = ["email", "username", "password", "verified", "verificationToken"];
+    // restrictedFields.forEach(field => delete updateFields[field]);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).select("-password -refreshToken -verificationToken");
+
+    if (!updatedUser) {
+      return res.status(404).json({ status: false, msg: "User not found" });
+    }
+
+    res.status(200).json({ status: true, msg: "Profile updated successfully", data: updatedUser });
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    res.status(500).json({ status: false, msg: "Failed to update profile" });
+  }
+};
+
 module.exports = {
   emailVerify,
   register,
@@ -875,4 +879,5 @@ module.exports = {
   AskQuestion,
   uploadFile,
   getUser,
+  profile
 };

@@ -11,8 +11,9 @@ const {
   updateUser,
   uploadFile,
   AskQuestion,
+  profile,
 } = require("../controller/userController"); // Use require() instead of just referencing the path
-const { authenticate,authorization } = require("../middleware/mid");
+const { authenticate, authorization } = require("../middleware/mid");
 const { userContact } = require("../controller/contactController");
 
 // Define the route for email verification
@@ -25,6 +26,7 @@ router.put("/updateUser/:userId", authenticate, updateUser);
 router.post("/uploadFile", upload.single("report"), uploadFile);
 router.post("/AskQuestion", authenticate, AskQuestion);
 router.post("/userContact", userContact);
+router.post("/profile/:userId", authenticate, authorization, profile);
 
 // eslint-disable-next-line no-undef
 module.exports = router;
