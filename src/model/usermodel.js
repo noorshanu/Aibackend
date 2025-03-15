@@ -54,7 +54,6 @@ const userSchema = new mongoose.Schema({
       "Thai",
       "Indonesian",
       "Ukrainian",
-      
       // Add all 100 languages here...
     ],
     required: true, // Ensures that the user selects a language
@@ -63,7 +62,8 @@ const userSchema = new mongoose.Schema({
   preferredContactMethod: { type: [String], required: true },
   preferredAppointmentTime: { type: String },
   dateOfBirth: { type: Date },
-
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
   address: {
     street: { type: String },
     city: { type: String },
@@ -73,17 +73,22 @@ const userSchema = new mongoose.Schema({
   },
   verificationToken: { type: String },
   IsthisWhatsappPhoneNumber: { type: Boolean },
-  willingForInternationalTreatment: { type: Boolean, }, // New field required: true
+  willingForInternationalTreatment: { type: Boolean }, // New field required: true
   willingForMedicalTourism: { type: Boolean }, // New field
   wantZoctorAICallback: { type: Boolean }, // New field
   dateOfBirth: { type: Date }, // ✅ New field: Date of Birth
   gender: { type: String, enum: ["Male", "Female", "Other"] }, // ✅ New field: Gender
-  bloodType: { type: String, enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] }, // ✅ New field: Blood Type
+  bloodType: {
+    type: String,
+    enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+  }, // ✅ New field: Blood Type
   profilePicture: { type: String }, // ✅ New field: Profile Picture (URL or file path)
 
   subscribeNewsletter: { type: Boolean, default: false },
   consentToTerms: { type: Boolean }, //required: true },
   consentToPrivacyPolicy: { type: Boolean },
+  Smoking: { type: Boolean },
+  alchohal: { type: Boolean },
 
   createdAt: { type: Date, default: Date.now },
 });
