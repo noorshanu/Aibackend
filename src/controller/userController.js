@@ -433,80 +433,98 @@ const logoutUser = async (req, res) => {
 
 async function sendPasswordResetEmail(to, resetLink) {
   const emailHtml = `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
     <meta charset="utf-8">
-    <meta name="x-apple-disable-message-reformatting">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="x-apple-disable-message-reformatting">
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
     <meta name="color-scheme" content="light dark">
     <meta name="supported-color-schemes" content="light dark">
-    <title>Reset Password - Deelance</title>
+    <title>Reset Password - ZoctorAi</title>
     <style>
-      .hover-bg-primary-light:hover {
-        background-color: #55f3de !important;
-      }
-      .hover-text-decoration-underline:hover {
-        text-decoration: underline;
-      }
-      @media (max-width: 600px) {
-        .sm-w-full {
-          width: 100% !important;
+        :root {
+            color-scheme: light dark;
         }
-        .sm-py-8 {
-          padding-top: 32px !important;
-          padding-bottom: 32px !important;
+        .hover-bg-primary:hover {
+            background-color: #4338ca !important;
         }
-        .sm-px-6 {
-          padding-left: 24px !important;
-          padding-right: 24px !important;
+        .hover-shadow:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
         }
-        .sm-leading-8 {
-          line-height: 32px !important;
+        @media (max-width: 600px) {
+            .sm-w-full { width: 100% !important; }
+            .sm-py-8 { padding: 32px 24px !important; }
+            .sm-px-6 { padding-left: 24px !important; padding-right: 24px !important; }
+            .sm-leading-8 { line-height: 32px !important; }
         }
-      }
+        @media (prefers-color-scheme: dark) {
+            body { background-color: #1a1a1a !important; }
+            .dark-mode-bg { background-color: #262626 !important; }
+            .dark-mode-text { color: #e5e5e5 !important; }
+        }
     </style>
-  </head>
-  <body style="word-break: break-word; -webkit-font-smoothing: antialiased; margin: 0; width: 100%; background-color: #f8fafc; padding: 0">
+</head>
+<body style="margin: 0; padding: 0; width: 100%; word-break: break-word; -webkit-font-smoothing: antialiased; background-color: #f3f4f6;">
     <div role="article" aria-roledescription="email" lang="en">
-      <table style="width: 100%; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" cellpadding="0" cellspacing="0" role="presentation">
-        <tr>
-          <td align="center" style="background-color: #f8fafc">
-            <table class="sm-w-full" style="width: 600px" cellpadding="0" cellspacing="0" role="presentation">
-              <tr>
-                <td class="sm-py-8 sm-px-6" style="padding: 18px; background: #0A0A0B;">
-                  <h1 style="border: 0; color: #ffffff; max-width: 55%; vertical-align: middle">Deelance</h1>
+        <table style="width: 100%; font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+                <td align="center" style="padding: 24px 0;">
+                    <table class="sm-w-full" style="width: 600px; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);" cellpadding="0" cellspacing="0" role="presentation">
+                        <!-- Header -->
+                        <tr>
+                            <td style="padding: 32px 40px; background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+                                <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; text-align: center;">
+                                    ZoctorAi
+                                </h1>
+                            </td>
+                        </tr>
+                        <!-- Content -->
+                        <tr>
+                            <td class="sm-px-6" style="padding: 40px;">
+                                <div style="border-radius: 8px; background-color: #ffffff;">
+                                    <h2 style="margin: 0 0 16px; color: #1f2937; font-size: 24px; font-weight: 600;">
+                                        Password Reset Request
+                                    </h2>
+                                    <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 24px;">
+                                        Hello,
+                                    </p>
+                                    <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 24px;">
+                                        We received a request to reset your password for your ZoctorAi account. Click the button below to reset it:
+                                    </p>
+                                    <div style="text-align: center; margin: 32px 0;">
+                                        <a href="${resetLink}" 
+                                           class="hover-bg-primary hover-shadow" 
+                                           style="display: inline-block; padding: 14px 32px; background-color: #4f46e5; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px; transition: all 0.2s ease;">
+                                            Reset Password
+                                        </a>
+                                    </div>
+                                    <p style="margin: 24px 0 0; color: #6b7280; font-size: 14px; line-height: 20px;">
+                                        If you didn't request this password reset, please ignore this email or contact support if you have concerns.
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Footer -->
+                        <tr>
+                            <td style="padding: 32px 40px; background-color: #f9fafb; text-align: center;">
+                                <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                                    &copy; ${new Date().getFullYear()} ZoctorAi. All rights reserved.
+                                </p>
+                                <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">
+                                    Your Trusted Healthcare AI Assistant
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
                 </td>
-              </tr>
-              <tr>
-                <td align="center" class="sm-px-6">
-                  <table style="width: 100%" cellpadding="0" cellspacing="0" role="presentation">
-                    <tr>
-                      <td class="sm-px-6" style="border-radius: 4px; background-color: #fff; padding: 16px 28px 16px 28px; text-align: left; font-size: 14px; line-height: 24px; color: #334155; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05)">
-                        <p>Hello,</p>
-                        <p>To reset your password, please click the button below:</p>
-                        <div style="line-height: 100%; margin-bottom: 20px; text-align: center;">
-                          <a href="${resetLink}" class="hover-bg-primary-light" style="text-decoration: none; display: inline-block; border-radius: 4px; background-color: #864DD2; padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px; text-align: center; font-size: 14px; font-weight: 600; color: #fff">Reset Password &rarr;</a>
-                        </div>
-                        <p>Cheers,</p>
-                        <p>The ZoctorAi Team</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="height: 48px"></td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
+            </tr>
+        </table>
     </div>
-  </body>
-  </html>`;
+</body>
+</html>`;
 
   const mailOptions = {
     from: "noreplyzoctorai@gmail.com",
@@ -603,7 +621,7 @@ const resetPasswordtoken = async (req, res) => {
 //     const data = await pdfParse(pdfBuffer);
 //     return data.text;
 //   } catch (error) {
-//     throw new Error(`Error extracting text from PDF: ${error.message}`);
+//     throw new Error("Error extracting text from PDF");
 //   }
 // };
 
