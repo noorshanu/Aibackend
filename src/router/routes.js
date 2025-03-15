@@ -12,6 +12,9 @@ const {
   uploadFile,
   AskQuestion,
   profile,
+  resetPasswordtoken,
+  forgotpassword,
+  RefreshToken
 } = require("../controller/userController"); // Use require() instead of just referencing the path
 const { authenticate, authorization } = require("../middleware/mid");
 const { userContact } = require("../controller/contactController");
@@ -27,6 +30,8 @@ router.post("/uploadFile", upload.single("report"), uploadFile);
 router.post("/AskQuestion", authenticate, AskQuestion);
 router.post("/userContact", userContact);
 router.post("/profile/:userId", authenticate, authorization, profile);
-
+router.post("/forgot-password", forgotpassword);
+router.post("/reset-password/:token", resetPasswordtoken);
+router.post('/refresh-token', RefreshToken);
 // eslint-disable-next-line no-undef
 module.exports = router;
