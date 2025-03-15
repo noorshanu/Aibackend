@@ -65,6 +65,8 @@ const verifySchema = new mongoose.Schema({
       url: { type: String },
     },
   ],
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
   address: {
     street: { type: String },
     city: { type: String },
@@ -88,6 +90,8 @@ const verifySchema = new mongoose.Schema({
   subscribeNewsletter: { type: Boolean, default: false },
   consentToTerms: { type: Boolean }, //required: true },
   consentToPrivacyPolicy: { type: Boolean },
+  Smoking: { type: Boolean },
+  alchohal: { type: Boolean },
 
   createdAt: { type: Date, default: Date.now },
 });
