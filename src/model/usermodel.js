@@ -54,6 +54,7 @@ const userSchema = new mongoose.Schema({
       "Thai",
       "Indonesian",
       "Ukrainian",
+      
       // Add all 100 languages here...
     ],
     required: true, // Ensures that the user selects a language

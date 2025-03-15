@@ -6,7 +6,7 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 const Bottleneck = require("bottleneck");
 const verify = require("../model/verifyModel");
-const mongoose = require("mongoose");  // ✅ Add this line
+const mongoose = require("mongoose");  
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -431,6 +431,173 @@ const logoutUser = async (req, res) => {
   }
 };
 
+async function sendPasswordResetEmail(to, resetLink) {
+  const emailHtml = `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>Reset Password - Deelance</title>
+    <style>
+      .hover-bg-primary-light:hover {
+        background-color: #55f3de !important;
+      }
+      .hover-text-decoration-underline:hover {
+        text-decoration: underline;
+      }
+      @media (max-width: 600px) {
+        .sm-w-full {
+          width: 100% !important;
+        }
+        .sm-py-8 {
+          padding-top: 32px !important;
+          padding-bottom: 32px !important;
+        }
+        .sm-px-6 {
+          padding-left: 24px !important;
+          padding-right: 24px !important;
+        }
+        .sm-leading-8 {
+          line-height: 32px !important;
+        }
+      }
+    </style>
+  </head>
+  <body style="word-break: break-word; -webkit-font-smoothing: antialiased; margin: 0; width: 100%; background-color: #f8fafc; padding: 0">
+    <div role="article" aria-roledescription="email" lang="en">
+      <table style="width: 100%; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td align="center" style="background-color: #f8fafc">
+            <table class="sm-w-full" style="width: 600px" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td class="sm-py-8 sm-px-6" style="padding: 18px; background: #0A0A0B;">
+                  <h1 style="border: 0; color: #ffffff; max-width: 55%; vertical-align: middle">Deelance</h1>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" class="sm-px-6">
+                  <table style="width: 100%" cellpadding="0" cellspacing="0" role="presentation">
+                    <tr>
+                      <td class="sm-px-6" style="border-radius: 4px; background-color: #fff; padding: 16px 28px 16px 28px; text-align: left; font-size: 14px; line-height: 24px; color: #334155; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05)">
+                        <p>Hello,</p>
+                        <p>To reset your password, please click the button below:</p>
+                        <div style="line-height: 100%; margin-bottom: 20px; text-align: center;">
+                          <a href="${resetLink}" class="hover-bg-primary-light" style="text-decoration: none; display: inline-block; border-radius: 4px; background-color: #864DD2; padding-top: 14px; padding-bottom: 14px; padding-left: 16px; padding-right: 16px; text-align: center; font-size: 14px; font-weight: 600; color: #fff">Reset Password &rarr;</a>
+                        </div>
+                        <p>Cheers,</p>
+                        <p>The ZoctorAi Team</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="height: 48px"></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </body>
+  </html>`;
+
+  const mailOptions = {
+    from: "noreplyzoctorai@gmail.com",
+    to,
+    subject: "Reset Password - ZoctorAi",
+    html: emailHtml,
+  };
+
+  try {
+    const result = await transporter.sendMail(mailOptions);
+    console.log("Email inviata con successo:", result);
+  } catch (error) {
+    console.error("Errore nell'invio dell'email:", error);
+  }
+}
+const forgotpassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    const token = crypto.randomBytes(20).toString("hex");
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+    await sendPasswordResetEmail(user.email, resetUrl);
+    // Send email with resetUrl...
+
+    res.status(200).send({
+      msg: "Password reset link sent to your email address. Please reset your password!",
+      data: resetUrl,
+    });
+  } catch (error) {
+    console.error("Failed to initiate password reset:", error);
+    res.status(500).send({ msg: "Failed to initiate password reset" });
+  }
+};
+const resetPasswordtoken = async (req, res) => {
+  try {
+    const { password } = req.body;
+    const { token } = req.params;
+
+    if (!password) {
+      return res.status(400).send({ msg: "Please enter a new password" });
+    }
+
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .send({ msg: "Password must be at least 8 characters long" });
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).send("Invalid or expired token");
+    }
+
+    const isSamePassword = await user.isPasswordCorrect(password); // Compare passwords
+    if (isSamePassword) {
+      return res
+        .status(400)
+        .send("New password cannot be the same as the old password");
+    }
+
+    // If the new password is different, update the password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    user.refreshToken = undefined;
+
+    await user.save();
+
+    res
+      .status(200)
+      .send({ status: true, msg: "Password changed successfully!" });
+  } catch (error) {
+    console.error("Failed to reset password:", error);
+    res.status(500).send({ msg: "Failed to reset password" });
+  }
+};
+
 // const extractTextFromPDF = async (pdfBuffer) => {
 //   try {
 //     const data = await pdfParse(pdfBuffer);
@@ -845,9 +1012,9 @@ const AskQuestion = async (req, res) => {
 //   }
 // };
 
-const profile= async (req, res) => {
+const profile = async (req, res) => {
   try {
-    const { userId } = req.params
+    const { userId } = req.params;
     const updateFields = req.body;
 
     // Restricted fields
@@ -864,7 +1031,13 @@ const profile= async (req, res) => {
       return res.status(404).json({ status: false, msg: "User not found" });
     }
 
-    res.status(200).json({ status: true, msg: "Profile updated successfully", data: updatedUser });
+    res
+      .status(200)
+      .json({
+        status: true,
+        msg: "Profile updated successfully",
+        data: updatedUser,
+      });
   } catch (error) {
     console.error("Error updating user profile:", error);
     res.status(500).json({ status: false, msg: "Failed to update profile" });
@@ -880,5 +1053,8 @@ module.exports = {
   AskQuestion,
   uploadFile,
   getUser,
-  profile
+  profile,
+  forgotpassword,
+  RefreshToken,
+  resetPasswordtoken,
 };
