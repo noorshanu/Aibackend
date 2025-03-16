@@ -8,37 +8,28 @@ if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true }); // Create directory
 }
 
-// Configure Multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const fileExt = path.extname(file.originalname);
-    const uniqueId = Date.now();
-    const filename = `${path.basename(file.originalname, fileExt)}-${uniqueId}${fileExt}`;
-    cb(null, filename);
-  },
-});
+// Configure multer for memory storage
+const storage = multer.memoryStorage();
 
-// File type filter
+// File filter for images
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/gif"];
-
-  console.log(`Checking file type: ${file.mimetype}`); // Debug log
-
-  if (!allowedTypes.includes(file.mimetype)) {
-    console.log(`Rejected file: ${file.originalname}`);
-    return cb(new Error("Only PDF and image files (JPEG, PNG, GIF) are allowed"), false);
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Not an image! Please upload only images.'), false);
   }
-
-  cb(null, true);
 };
 
-// File size limit (e.g., 10 MB max)
-const limits = { fileSize: 10 * 1024 * 1024 }; // 10 MB
+// File size limit (e.g., 5 MB max)
+const limits = { fileSize: 5 * 1024 * 1024 }; // 5 MB
 
 // Multer configuration
-const upload = multer({ storage, fileFilter, limits });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  }
+});
 
 module.exports = { upload };

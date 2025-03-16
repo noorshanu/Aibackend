@@ -7,6 +7,8 @@ const axios = require("axios");
 const Bottleneck = require("bottleneck");
 const verify = require("../model/verifyModel");
 const mongoose = require("mongoose");  
+const cloudinary = require('../config/cloudinary');
+const { Readable } = require('stream');
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -1062,6 +1064,129 @@ const profile = async (req, res) => {
   }
 };
 
+// Helper function to upload to Cloudinary via stream
+const bufferToStream = (buffer) => {
+  const readable = new Readable({
+    read() {
+      this.push(buffer);
+      this.push(null);
+    },
+  });
+  return readable;
+};
+
+// Upload profile picture
+const uploadProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        status: false, 
+        msg: "Please upload an image" 
+      });
+    }
+
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        status: false, 
+        msg: "User not found" 
+      });
+    }
+
+    // If user already has a profile picture, delete it from Cloudinary
+    if (user.profilePicture && user.profilePicture.public_id) {
+      await cloudinary.uploader.destroy(user.profilePicture.public_id);
+    }
+
+    // Upload new image to Cloudinary
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "profile-pictures",
+        resource_type: "auto",
+      },
+      async (error, result) => {
+        if (error) {
+          console.error('Upload to Cloudinary failed:', error);
+          return res.status(500).json({ 
+            status: false, 
+            msg: "Error uploading image" 
+          });
+        }
+
+        // Update user profile with new image URL
+        user.profilePicture = {
+          public_id: result.public_id,
+          url: result.secure_url
+        };
+        await user.save();
+
+        res.status(200).json({
+          status: true,
+          msg: "Profile picture updated successfully",
+          data: {
+            profilePicture: user.profilePicture
+          }
+        });
+      }
+    );
+
+    // Convert buffer to stream and pipe to Cloudinary
+    bufferToStream(req.file.buffer).pipe(stream);
+
+  } catch (error) {
+    console.error('Error in uploadProfilePicture:', error);
+    res.status(500).json({ 
+      status: false, 
+      msg: "Failed to upload profile picture",
+      error: error.message 
+    });
+  }
+};
+
+// Remove profile picture
+const removeProfilePicture = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ 
+        status: false, 
+        msg: "User not found" 
+      });
+    }
+
+    if (!user.profilePicture || !user.profilePicture.public_id) {
+      return res.status(400).json({ 
+        status: false, 
+        msg: "No profile picture to remove" 
+      });
+    }
+
+    // Delete from Cloudinary
+    await cloudinary.uploader.destroy(user.profilePicture.public_id);
+
+    // Remove profile picture from user document
+    user.profilePicture = undefined;
+    await user.save();
+
+    res.status(200).json({
+      status: true,
+      msg: "Profile picture removed successfully"
+    });
+
+  } catch (error) {
+    console.error('Error in removeProfilePicture:', error);
+    res.status(500).json({ 
+      status: false, 
+      msg: "Failed to remove profile picture",
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   emailVerify,
   register,
@@ -1075,4 +1200,6 @@ module.exports = {
   forgotpassword,
   RefreshToken,
   resetPasswordtoken,
+  uploadProfilePicture,
+  removeProfilePicture,
 };

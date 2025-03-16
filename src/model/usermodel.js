@@ -82,7 +82,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
   }, // ✅ New field: Blood Type
-  profilePicture: { type: String }, // ✅ New field: Profile Picture (URL or file path)
+  profilePicture: {
+    public_id: String,
+    url: String
+  }, // ✅ New field: Profile Picture (URL or file path)
 
   subscribeNewsletter: { type: Boolean, default: false },
   consentToTerms: { type: Boolean }, //required: true },
