@@ -11,24 +11,24 @@ if (!fs.existsSync(uploadPath)) {
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
 
-// File filter for images
+// File filter for PDFs
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
+  if (file.mimetype === 'application/pdf') {
     cb(null, true);
   } else {
-    cb(new Error('Not an image! Please upload only images.'), false);
+    cb(new Error('Please upload only PDF files.'), false);
   }
 };
 
-// File size limit (e.g., 5 MB max)
-const limits = { fileSize: 5 * 1024 * 1024 }; // 5 MB
+// File size limit (e.g., 10 MB max)
+const limits = { fileSize: 10 * 1024 * 1024 }; // 10 MB
 
 // Multer configuration
 const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
   }
 });
 

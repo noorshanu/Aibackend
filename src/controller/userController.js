@@ -814,44 +814,54 @@ ${pdfText}
 `;
 
     const response = await model.generateContent(prompt);
-
-    // Return the text of the response
     return response.response.text();
+    
   } catch (error) {
-    console.error("Error analyzing medical report with Gemini:", error.message);
+    console.error("Error analyzing medical report with Gemini:", error);
     throw new Error("Failed to analyze medical report.");
   }
 };
 
 // Route handler to process file upload and analyze the medical report
 const uploadFile = async (req, res) => {
-  let pdfBuffer;
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
+      return res.status(400).json({ 
+        status: false, 
+        message: "No file uploaded" 
+      });
     }
 
-    pdfBuffer = fs.readFileSync(req.file.path);
+    // Extract text from the PDF buffer
+    try {
+      const extractedText = await extractTextFromPDF(req.file.buffer);
+      
+      // Analyze the extracted text using Gemini
+      const analysisResult = await analyzeMedicalReport(extractedText);
 
-    // Extract text from the PDF
-    const extractedText = await extractTextFromPDF(pdfBuffer);
+      // Respond with the analysis
+      res.status(200).json({
+        status: true,
+        message: "Medical report analysis complete",
+        analysis: analysisResult
+      });
 
-    // Analyze the extracted text using Gemini
-    const analysisResult = await analyzeMedicalReport(extractedText);
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+      return res.status(400).json({ 
+        status: false, 
+        message: "Error processing PDF file. Please ensure it's a valid PDF document.",
+        error: error.message 
+      });
+    }
 
-    // Respond with the analysis
-    res.status(200).json({
-      message: "Medical report analysis complete",
-      analysis: analysisResult,
-    });
   } catch (error) {
-    console.error("Error processing PDF:", error.message);
-    res.status(500).json({ error: error.message });
-  } finally {
-    // Clean up the uploaded file if it exists
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
+    console.error("Error in uploadFile:", error);
+    res.status(500).json({ 
+      status: false, 
+      message: "Failed to process file",
+      error: error.message 
+    });
   }
 };
 const AskQuestion = async (req, res) => {
