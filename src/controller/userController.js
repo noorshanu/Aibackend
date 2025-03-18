@@ -6,9 +6,14 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 const Bottleneck = require("bottleneck");
 const verify = require("../model/verifyModel");
-const mongoose = require("mongoose");  
-const cloudinary = require('../config/cloudinary');
-const { Readable } = require('stream');
+const mongoose = require("mongoose");
+const cloudinary = require("../config/cloudinary");
+const { Readable } = require("stream");
+const { pipeline } = require("stream")
+
+const { v4: uuidv4 } = require("uuid");
+const { S3Client, PutObjectCommand , GetObjectCommand} = require("@aws-sdk/client-s3");
+const path = require("path");
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -240,7 +245,9 @@ const updateUser = async (req, res) => {
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.error("❌ Invalid userId format:", userId);
-      return res.status(400).json({ status: false, msg: "Invalid userId format" });
+      return res
+        .status(400)
+        .json({ status: false, msg: "Invalid userId format" });
     }
 
     // Find user
@@ -269,7 +276,6 @@ const updateUser = async (req, res) => {
       msg: "User updated successfully",
       data: safeUser,
     });
-
   } catch (error) {
     console.error("🔥 ERROR UPDATING USER:", error.message, error.stack);
     return res.status(500).json({
@@ -823,6 +829,70 @@ ${pdfText}
 };
 
 // Route handler to process file upload and analyze the medical report
+// const uploadFile = async (req, res) => {
+//   let pdfBuffer;
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No file uploaded" });
+//     }
+
+//     pdfBuffer = fs.readFileSync(req.file.path);
+
+//     // Extract text from the PDF
+//     const extractedText = await extractTextFromPDF(pdfBuffer);
+
+//     // Analyze the extracted text using Gemini
+//     const analysisResult = await analyzeMedicalReport(extractedText);
+
+//     // Respond with the analysis
+//     res.status(200).json({
+//       message: "Medical report analysis complete",
+//       analysis: analysisResult,
+//     });
+//   } catch (error) {
+//     console.error("Error processing PDF:", error.message);
+//     res.status(500).json({ error: error.message });
+// } finally {
+//   // Clean up the uploaded file if it exists
+//   if (req.file) {
+//     fs.unlinkSync(req.file.path);
+//   }
+//   }
+// };
+
+const pdfModel = require("../model/pdfModel");
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const cleanUploadsFolder = () => {
+  const uploadDir = path.join(__dirname, "../uploads");
+
+  if (!fs.existsSync(uploadDir)) return;
+
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      console.error("⚠️ Error reading uploads folder:", err);
+      return;
+    }
+
+    files.forEach((file) => {
+      const filePath = path.join(uploadDir, file);
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error(`⚠️ Error deleting file: ${filePath}`, err);
+        } else {
+          console.log(`✅ Deleted file: ${filePath}`);
+        }
+      });
+    });
+  });
+};
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
@@ -832,38 +902,142 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    // Extract text from the PDF buffer
-    try {
-      const extractedText = await extractTextFromPDF(req.file.buffer);
-      
-      // Analyze the extracted text using Gemini
-      const analysisResult = await analyzeMedicalReport(extractedText);
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized user" });
 
-      // Respond with the analysis
-      res.status(200).json({
-        status: true,
-        message: "Medical report analysis complete",
-        analysis: analysisResult
-      });
-
-    } catch (error) {
-      console.error("Error processing PDF:", error);
-      return res.status(400).json({ 
-        status: false, 
-        message: "Error processing PDF file. Please ensure it's a valid PDF document.",
-        error: error.message 
-      });
+    // Ensure upload directory exists
+    const uploadDir = path.join(__dirname, "../uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-  } catch (error) {
-    console.error("Error in uploadFile:", error);
-    res.status(500).json({ 
-      status: false, 
-      message: "Failed to process file",
-      error: error.message 
+    const fileName = `${Date.now()}_${req.file.originalname}`;
+    const filePath = path.join(uploadDir, fileName);
+
+    // **Save file locally using buffer**
+    fs.writeFileSync(filePath, req.file.buffer);
+    console.log("✅ File saved locally:", filePath);
+
+    // **Extract text if PDF**
+    let summary = null;
+    if (req.file.mimetype === "application/pdf") {
+      try {
+        const extractedText = await extractTextFromPDF(req.file.buffer);
+        summary = await analyzeMedicalReport(extractedText);
+      } catch (pdfError) {
+        console.error("⚠️ PDF Processing Error:", pdfError.message);
+      }
+    }
+
+    // **Upload file to AWS S3**
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+      Body: req.file.buffer, // Use buffer instead of readStream
+      ContentType: req.file.mimetype,
+    };
+
+    await s3.send(new PutObjectCommand(uploadParams));
+
+    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+    console.log("✅ File uploaded to AWS:", fileUrl);
+
+    // **Delete only files inside uploads folder**
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log("✅ Local file deleted:", filePath);
+    } else {
+      console.warn("⚠️ Skipping deletion (file not found):", filePath);
+    }
+
+    // **Save details in MongoDB**
+    await pdfModel.create({
+      userId,
+      fileName,
+      fileUrl,
+      summary,
     });
+
+    console.log("✅ File details saved in MongoDB.");
+
+    res.status(200).json({
+      message: "File uploaded successfully",
+      fileUrl,
+      summary,
+    });
+  } catch (error) {
+    console.error("❌ Upload Error:", error.message);
+    res.status(500).json({ error: error.message });
+  } finally {
+    cleanUploadsFolder();
   }
 };
+
+const getAllUserReports = async (req, res) => {
+  try {
+    const userId = req.user?.user_id; // Logged-in user ID
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized user" });
+    }
+
+    // **Find all reports belonging to the user**
+    const userReports = await pdfModel.find({ userId });
+
+    if (userReports.length === 0) {
+      return res.status(404).json({ message: "No reports found for this user" });
+    }
+
+    res.status(200).json({
+      message: "Reports retrieved successfully",
+      reports: userReports,
+    });
+  } catch (error) {
+    console.error(" Error fetching reports:", error.message);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+};
+
+
+const downloadUserReport = async (req, res) => {
+  try {
+    const userId = req.user?._id; // Logged-in user ID
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized user" });
+    }
+
+    const { fileName } = req.params;
+
+    // **Find the file in MongoDB and verify ownership**
+    const fileRecord = await pdfModel.findOne({ fileName, userId });
+
+    if (!fileRecord) {
+      return res.status(403).json({ error: "Access denied: File not found or unauthorized" });
+    }
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+    };
+
+    const command = new GetObjectCommand(params);
+    const { Body, ContentType } = await s3.send(command);
+
+    res.setHeader("Content-Type", ContentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+
+    // **Stream file from S3 to response**
+    pipeline(Body, res, (err) => {
+      if (err) {
+        console.error("❌ Stream error:", err);
+        res.status(500).json({ error: "File streaming failed" });
+      }
+    });
+  } catch (error) {
+    console.error("❌ Download Error:", error.message);
+    res.status(500).json({ error: "File download failed" });
+  }
+};
+
 const AskQuestion = async (req, res) => {
   try {
     const { question, context } = req.body;
@@ -1061,13 +1235,11 @@ const profile = async (req, res) => {
       return res.status(404).json({ status: false, msg: "User not found" });
     }
 
-    res
-      .status(200)
-      .json({
-        status: true,
-        msg: "Profile updated successfully",
-        data: updatedUser,
-      });
+    res.status(200).json({
+      status: true,
+      msg: "Profile updated successfully",
+      data: updatedUser,
+    });
   } catch (error) {
     console.error("Error updating user profile:", error);
     res.status(500).json({ status: false, msg: "Failed to update profile" });
@@ -1089,19 +1261,19 @@ const bufferToStream = (buffer) => {
 const uploadProfilePicture = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        status: false, 
-        msg: "Please upload an image" 
+      return res.status(400).json({
+        status: false,
+        msg: "Please upload an image",
       });
     }
 
     const userId = req.params.userId;
     const user = await User.findById(userId);
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        status: false, 
-        msg: "User not found" 
+      return res.status(404).json({
+        status: false,
+        msg: "User not found",
       });
     }
 
@@ -1118,17 +1290,17 @@ const uploadProfilePicture = async (req, res) => {
       },
       async (error, result) => {
         if (error) {
-          console.error('Upload to Cloudinary failed:', error);
-          return res.status(500).json({ 
-            status: false, 
-            msg: "Error uploading image" 
+          console.error("Upload to Cloudinary failed:", error);
+          return res.status(500).json({
+            status: false,
+            msg: "Error uploading image",
           });
         }
 
         // Update user profile with new image URL
         user.profilePicture = {
           public_id: result.public_id,
-          url: result.secure_url
+          url: result.secure_url,
         };
         await user.save();
 
@@ -1136,21 +1308,20 @@ const uploadProfilePicture = async (req, res) => {
           status: true,
           msg: "Profile picture updated successfully",
           data: {
-            profilePicture: user.profilePicture
-          }
+            profilePicture: user.profilePicture,
+          },
         });
       }
     );
 
     // Convert buffer to stream and pipe to Cloudinary
     bufferToStream(req.file.buffer).pipe(stream);
-
   } catch (error) {
-    console.error('Error in uploadProfilePicture:', error);
-    res.status(500).json({ 
-      status: false, 
+    console.error("Error in uploadProfilePicture:", error);
+    res.status(500).json({
+      status: false,
       msg: "Failed to upload profile picture",
-      error: error.message 
+      error: error.message,
     });
   }
 };
@@ -1162,16 +1333,16 @@ const removeProfilePicture = async (req, res) => {
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ 
-        status: false, 
-        msg: "User not found" 
+      return res.status(404).json({
+        status: false,
+        msg: "User not found",
       });
     }
 
     if (!user.profilePicture || !user.profilePicture.public_id) {
-      return res.status(400).json({ 
-        status: false, 
-        msg: "No profile picture to remove" 
+      return res.status(400).json({
+        status: false,
+        msg: "No profile picture to remove",
       });
     }
 
@@ -1184,15 +1355,14 @@ const removeProfilePicture = async (req, res) => {
 
     res.status(200).json({
       status: true,
-      msg: "Profile picture removed successfully"
+      msg: "Profile picture removed successfully",
     });
-
   } catch (error) {
-    console.error('Error in removeProfilePicture:', error);
-    res.status(500).json({ 
-      status: false, 
+    console.error("Error in removeProfilePicture:", error);
+    res.status(500).json({
+      status: false,
       msg: "Failed to remove profile picture",
-      error: error.message 
+      error: error.message,
     });
   }
 };
@@ -1212,4 +1382,6 @@ module.exports = {
   resetPasswordtoken,
   uploadProfilePicture,
   removeProfilePicture,
+  downloadUserReport,
+  getAllUserReports
 };
