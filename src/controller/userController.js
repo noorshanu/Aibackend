@@ -895,6 +895,9 @@ const cleanUploadsFolder = () => {
 };
 const uploadFile = async (req, res) => {
   try {
+    const { userId } = req.params;
+
+    // Check if file exists
     if (!req.file) {
       return res.status(400).json({ 
         status: false, 
@@ -902,74 +905,48 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ error: "Unauthorized user" });
-
-    // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Validate user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found"
+      });
     }
 
-    const fileName = `${Date.now()}_${req.file.originalname}`;
-    const filePath = path.join(uploadDir, fileName);
+    // Extract text from the PDF buffer
+    try {
+      const extractedText = await extractTextFromPDF(req.file.buffer);
+      
+      // Analyze the extracted text using Gemini
+      const analysisResult = await analyzeMedicalReport(extractedText);
 
-    // **Save file locally using buffer**
-    fs.writeFileSync(filePath, req.file.buffer);
-    console.log("✅ File saved locally:", filePath);
+      // Save the analysis to user's records if needed
+      // You might want to store this in a separate collection or in the user document
+      
+      // Respond with the analysis
+      res.status(200).json({
+        status: true,
+        message: "Medical report analysis complete",
+        analysis: analysisResult
+      });
 
-    // **Extract text if PDF**
-    let summary = null;
-    if (req.file.mimetype === "application/pdf") {
-      try {
-        const extractedText = await extractTextFromPDF(req.file.buffer);
-        summary = await analyzeMedicalReport(extractedText);
-      } catch (pdfError) {
-        console.error("⚠️ PDF Processing Error:", pdfError.message);
-      }
+    } catch (error) {
+      console.error("Error processing PDF:", error);
+      return res.status(400).json({ 
+        status: false, 
+        message: "Error processing PDF file. Please ensure it's a valid PDF document.",
+        error: error.message 
+      });
     }
 
-    // **Upload file to AWS S3**
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileName,
-      Body: req.file.buffer, // Use buffer instead of readStream
-      ContentType: req.file.mimetype,
-    };
-
-    await s3.send(new PutObjectCommand(uploadParams));
-
-    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-    console.log("✅ File uploaded to AWS:", fileUrl);
-
-    // **Delete only files inside uploads folder**
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("✅ Local file deleted:", filePath);
-    } else {
-      console.warn("⚠️ Skipping deletion (file not found):", filePath);
-    }
-
-    // **Save details in MongoDB**
-    await pdfModel.create({
-      userId,
-      fileName,
-      fileUrl,
-      summary,
-    });
-
-    console.log("✅ File details saved in MongoDB.");
-
-    res.status(200).json({
-      message: "File uploaded successfully",
-      fileUrl,
-      summary,
-    });
   } catch (error) {
-    console.error("❌ Upload Error:", error.message);
-    res.status(500).json({ error: error.message });
-  } finally {
-    cleanUploadsFolder();
+    console.error("Error in uploadFile:", error);
+    res.status(500).json({ 
+      status: false, 
+      message: "Failed to process file",
+      error: error.message 
+    });
   }
 };
 

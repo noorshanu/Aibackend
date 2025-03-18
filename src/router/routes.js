@@ -29,7 +29,7 @@ router.get("/email-verify", emailVerify);
 router.post("/login", loginUser);
 router.post("/logout", authenticate, logoutUser);
 router.put("/updateUser/:userId", authenticate, updateUser);
-router.post("/uploadFile/:userId", authenticate, AWSauthorization,upload.single("file"), uploadFile);
+router.post("/uploadFile/:userId", authenticate, upload.single("file"), uploadFile);
 router.get("/reports", authenticateUser, getAllUserReports)
 router.post("/AskQuestion", authenticate, AskQuestion);
 router.post("/userContact", userContact);
