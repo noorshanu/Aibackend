@@ -9,10 +9,15 @@ const verify = require("../model/verifyModel");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const { Readable } = require("stream");
-const { pipeline } = require("stream")
+const { pipeline } = require("stream");
 
 const { v4: uuidv4 } = require("uuid");
-const { S3Client, PutObjectCommand , GetObjectCommand} = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} = require("@aws-sdk/client-s3");
 const path = require("path");
 
 const transporter = nodemailer.createTransport({
@@ -795,33 +800,112 @@ const analyzeMedicalReport = async (pdfText) => {
     //   Report Content:
     //   ${pdfText}
     // `;
+    //     const prompt = `
+    // You are a medical report analyzer. Analyze the following medical report thoroughly and provide a comprehensive response, including:
+
+    // 1. **Key Observations**:
+    //    - Highlight critical findings, specific values (e.g., blood pressure, cholesterol levels, glucose levels), and their medical implications.
+    //    - Identify any abnormal or noteworthy values and explain their significance.
+
+    // 2. **Summary**:
+    //    - Provide a concise summary of the patient's overall health based on the report.
+    //    - Mention any patterns or trends observed in the data.
+
+    // 3. **Actionable Recommendations**:
+    //    - Suggest specific actions the patient should take, including lifestyle changes, dietary recommendations, and the need for further medical consultation.
+    //    - If applicable, recommend additional tests or follow-ups for better assessment.
+
+    // 4. **Additional Notes**:
+    //    - Mention anything unusual or areas that require clarification from the patient or healthcare provider.
+
+    // Ensure the response is clear, concise, and formatted using bullet points for easy understanding.
+
+    // **Report Content**:
+    // ${pdfText}
+    // `;
     const prompt = `
-You are a medical report analyzer. Analyze the following medical report thoroughly and provide a comprehensive response, including:
+    You are an advanced AI-powered healthcare assistant tasked with generating a comprehensive medical report based on the provided patient data. Follow the structured template below for analysis and recommendations.
 
-1. **Key Observations**:
-   - Highlight critical findings, specific values (e.g., blood pressure, cholesterol levels, glucose levels), and their medical implications.
-   - Identify any abnormal or noteworthy values and explain their significance.
+    ---
 
-2. **Summary**:
-   - Provide a concise summary of the patient's overall health based on the report.
-   - Mention any patterns or trends observed in the data.
+    ### **Patient Medical Report Analysis**
+    #### **1. Key Observations:**
+    - Extract critical findings from the report, highlighting important values such as blood pressure, cholesterol, glucose levels, BMI, and heart rate.
+    - Identify any abnormal or borderline values and explain their significance.
+    - Compare current values with normal medical standards.
 
-3. **Actionable Recommendations**:
-   - Suggest specific actions the patient should take, including lifestyle changes, dietary recommendations, and the need for further medical consultation.
-   - If applicable, recommend additional tests or follow-ups for better assessment.
+    #### **2. Executive Health Summary:**
+    - Provide a high-level summary of the patient's overall health status.
+    - Mention if the patient’s health trends are improving or deteriorating.
 
-4. **Additional Notes**:
-   - Mention anything unusual or areas that require clarification from the patient or healthcare provider.
+    #### **3. Biological Age Analysis:**
+    - Chronological Age: (Extract from the report)
+    - Estimated Biological Age: (Analyze based on key health metrics)
+    - Compare biological vs. chronological age and provide an interpretation.
 
-Ensure the response is clear, concise, and formatted using bullet points for easy understanding.
+    #### **4. Health Metrics Overview (Tabular Format):**
+    | Metric         | Current Value | Normal Range | Observation & Trend |
+    |---------------|--------------|--------------|----------------------|
+    | BMI           | [Extract]     | 18.5–24.9    | [Improving/Worsening] |
+    | Blood Pressure| [Extract]     | 120/80 mmHg  | [Improving/Worsening] |
+    | Blood Sugar   | [Extract]     | 70–99 mg/dL  | [Improving/Worsening] |
+    | Cholesterol   | [Extract]     | <200 mg/dL   | [Improving/Worsening] |
+    | Heart Rate    | [Extract]     | 60–100 bpm   | [Improving/Worsening] |
 
-**Report Content**:
-${pdfText}
-`;
+    #### **5. Trend Analysis & Long-term Impact:**
+    - Identify trends in health metrics based on previous data.
+    - Predict possible long-term health risks if the current trends persist.
+    - Recommend lifestyle or medical interventions to improve outcomes.
+
+    #### **6. Risk Assessment & Recommendations:**
+    List the top 3 health risks with severity levels (High, Medium, Low) and interventions:
+
+    - **Risk 1:** [Condition] - Severity: [High/Medium/Low] - Suggested action: [Lifestyle change, medical treatment, etc.]
+    - **Risk 2:** [Condition] - Severity: [High/Medium/Low] - Suggested action: [Lifestyle change, medical treatment, etc.]
+    - **Risk 3:** [Condition] - Severity: [High/Medium/Low] - Suggested action: [Lifestyle change, medical treatment, etc.]
+
+    #### **7. Recommended Treatments & Specialist Hospitals:**
+    Provide hospitals that specialize in treating identified conditions.
+
+    - **Condition:** [Extract from Report]
+    - **Recommended Hospitals:** [Dynamic list from database]
+
+    #### **8. Medication Insights & Interactions:**
+    - List any prescribed medications and their effects.
+    - Identify potential interactions with other medications.
+    - Suggest alternative treatments if necessary.
+
+    #### **9. Nutritional Supplements & Diet Recommendations:**
+    - Recommend specific vitamins and supplements based on deficiencies in the report.
+    - Provide detailed dosages, timing, and precautions.
+
+    #### **10. Personalized Exercise & Mental Health Recommendations:**
+    - Suggest exercises suitable for the patient’s condition.
+    - Assess mental health status and provide stress management techniques.
+
+    #### **11. Preventive Screening & Next Steps:**
+    - Suggest future screenings based on age and health risks.
+    - List actionable steps the patient should take, such as scheduling a doctor’s appointment or adopting new lifestyle habits.
+
+    ---
+
+    ### **Report Content for Analysis:**
+    ${pdfText}
+
+    ---
+
+    **Instructions for AI:**
+    - Ensure clarity, proper formatting, and bullet points for easy readability.
+    - Avoid unnecessary repetition and keep insights concise yet comprehensive.
+    - Where applicable, use medical guidelines to justify observations and recommendations.
+
+    ---
+
+    **Now, analyze the report based on this template and generate the output.**
+    `;
 
     const response = await model.generateContent(prompt);
     return response.response.text();
-    
   } catch (error) {
     console.error("Error analyzing medical report with Gemini:", error);
     throw new Error("Failed to analyze medical report.");
@@ -896,9 +980,9 @@ const cleanUploadsFolder = () => {
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        status: false, 
-        message: "No file uploaded" 
+      return res.status(400).json({
+        status: false,
+        message: "No file uploaded",
       });
     }
 
@@ -984,7 +1068,9 @@ const getAllUserReports = async (req, res) => {
     const userReports = await pdfModel.find({ userId });
 
     if (userReports.length === 0) {
-      return res.status(404).json({ message: "No reports found for this user" });
+      return res
+        .status(404)
+        .json({ message: "No reports found for this user" });
     }
 
     res.status(200).json({
@@ -997,10 +1083,9 @@ const getAllUserReports = async (req, res) => {
   }
 };
 
-
 const downloadUserReport = async (req, res) => {
   try {
-    const userId = req.user?._id; // Logged-in user ID
+    const userId = req.user?.user_id; // Logged-in user ID
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized user" });
     }
@@ -1008,10 +1093,12 @@ const downloadUserReport = async (req, res) => {
     const { fileName } = req.params;
 
     // **Find the file in MongoDB and verify ownership**
-    const fileRecord = await pdfModel.findOne({ fileName, userId });
+    const fileRecord = await pdfModel.find({ fileName, userId });
 
     if (!fileRecord) {
-      return res.status(403).json({ error: "Access denied: File not found or unauthorized" });
+      return res
+        .status(403)
+        .json({ error: "Access denied: File not found or unauthorized" });
     }
 
     const params = {
@@ -1367,6 +1454,49 @@ const removeProfilePicture = async (req, res) => {
   }
 };
 
+const deleteUserReport = async (req, res) => {
+  try {
+    const userIdFromToken = req.user?.user_id; // Extract user ID from token
+    const { reportId } = req.params; // Get report ID from request params
+
+    if (!userIdFromToken) {
+      return res.status(401).json({ error: "Unauthorized user" });
+    }
+
+    // Find the report in MongoDB
+    const report = await pdfModel.findOne({
+      _id: reportId,
+      userId: userIdFromToken,
+    });
+    if (!report) {
+      return res
+        .status(404)
+        .json({ error: "Report not found or unauthorized" });
+    }
+
+    const fileKey = report.fileName; // Extract file name (AWS S3 key)
+
+    // **Step 1: Delete file from AWS S3**
+    const deleteParams = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileKey,
+    };
+
+    await s3.send(new DeleteObjectCommand(deleteParams));
+    console.log("✅ File deleted from AWS:", fileKey);
+
+    // **Step 2: Delete report from MongoDB**
+    await pdfModel.deleteOne({ _id: reportId });
+
+    console.log("✅ Report deleted from MongoDB.");
+
+    res.status(200).json({ message: "Report deleted successfully" });
+  } catch (error) {
+    console.error("❌ Delete Error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   emailVerify,
   register,
@@ -1383,5 +1513,6 @@ module.exports = {
   uploadProfilePicture,
   removeProfilePicture,
   downloadUserReport,
-  getAllUserReports
+  getAllUserReports,
+  deleteUserReport,
 };
