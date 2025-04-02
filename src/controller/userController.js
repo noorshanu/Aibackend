@@ -10,6 +10,9 @@ const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const { Readable } = require("stream");
 const { pipeline } = require("stream");
+const { PDFDocument } = require("pdf-lib");
+
+
 
 const { v4: uuidv4 } = require("uuid");
 const {
@@ -788,7 +791,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY); // Set your AP
 // Analyze medical report using Gemini model
 const analyzeMedicalReport = async (pdfText) => {
   try {
-    const model = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = await genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Refined prompt for clearer output
     // const prompt = `
@@ -977,12 +980,176 @@ const cleanUploadsFolder = () => {
     });
   });
 };
+// const uploadFile = async (req, res) => {
+//   try {
+//     if (!req.files) {
+//       return res.status(400).json({
+//         status: false,
+//         message: "No file uploaded",
+//       });
+//     }
+
+//     const userId = req.user?._id;
+//     if (!userId) return res.status(401).json({ error: "Unauthorized user" });
+
+//     // Ensure upload directory exists
+//     const uploadDir = path.join(__dirname, "../uploads");
+//     if (!fs.existsSync(uploadDir)) {
+//       fs.mkdirSync(uploadDir, { recursive: true });
+//     }
+
+//     const fileName = `${Date.now()}_${req.files.originalname}`;
+//     const filePath = path.join(uploadDir, fileName);
+
+//     // **Save file locally using buffer**
+//     fs.writeFileSync(filePath, req.files.buffer);
+//     console.log("✅ File saved locally:", filePath);
+
+//     // **Extract text if PDF**
+//     let summary = null;
+//     if (req.file.mimetype === "application/pdf") {
+//       try {
+//         const extractedText = await extractTextFromPDF(req.files.buffer);
+//         summary = await analyzeMedicalReport(extractedText);
+//       } catch (pdfError) {
+//         console.error("⚠️ PDF Processing Error:", pdfError.message);
+//       }
+//     }
+
+//     // **Upload file to AWS S3**
+//     const uploadParams = {
+//       Bucket: process.env.AWS_BUCKET_NAME,
+//       Key: fileName,
+//       Body: req.files.buffer, // Use buffer instead of readStream
+//       ContentType: req.file.mimetype,
+//     };
+
+//     await s3.send(new PutObjectCommand(uploadParams));
+
+//     const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+//     console.log("✅ File uploaded to AWS:", fileUrl);
+
+//     // **Delete only files inside uploads folder**
+//     if (fs.existsSync(filePath)) {
+//       fs.unlinkSync(filePath);
+//       console.log("✅ Local file deleted:", filePath);
+//     } else {
+//       console.warn("⚠️ Skipping deletion (file not found):", filePath);
+//     }
+
+//     // **Save details in MongoDB**
+//     await pdfModel.create({
+//       userId,
+//       fileName,
+//       fileUrl,
+//       summary,
+//     });
+
+//     console.log("✅ File details saved in MongoDB.");
+
+//     res.status(200).json({
+//       message: "File uploaded successfully",
+//       fileUrl,
+//       summary,
+//     });
+//   } catch (error) {
+//     console.error("❌ Upload Error:", error.message);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     cleanUploadsFolder();
+//   }
+// };
+
+
+// const uploadFile = async (req, res) => {
+//   try {
+//     if (!req.files || req.files.length === 0) {
+//       return res.status(400).json({
+//         status: false,
+//         message: "No files uploaded",
+//       });
+//     }
+
+//     const userId = req.user?._id;
+//     if (!userId) return res.status(401).json({ error: "Unauthorized user" });
+
+//     // Ensure upload directory exists
+//     const uploadDir = path.join(__dirname, "../uploads");
+//     if (!fs.existsSync(uploadDir)) {
+//       fs.mkdirSync(uploadDir, { recursive: true });
+//     }
+
+//     const uploadedFiles = [];
+
+//     for (const file of req.files) {
+//       const fileName = `${Date.now()}_${file.originalname}`;
+//       const filePath = path.join(uploadDir, fileName);
+
+//       // **Save file locally using buffer**
+//       fs.writeFileSync(filePath, file.buffer);
+//       console.log("✅ File saved locally:", filePath);
+
+//       // **Extract text if PDF**
+//       let summary = null;
+//       if (file.mimetype === "application/pdf") {
+//         try {
+//           const extractedText = await extractTextFromPDF(file.buffer);
+//           summary = await analyzeMedicalReport(extractedText);
+//         } catch (pdfError) {
+//           console.error("⚠️ PDF Processing Error:", pdfError.message);
+//         }
+//       }
+
+//       // **Upload file to AWS S3**
+//       const uploadParams = {
+//         Bucket: process.env.AWS_BUCKET_NAME,
+//         Key: fileName,
+//         Body: file.buffer, // Use buffer instead of readStream
+//         ContentType: file.mimetype,
+//       };
+
+//       await s3.send(new PutObjectCommand(uploadParams));
+
+//       const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+//       console.log("✅ File uploaded to AWS:", fileUrl);
+
+//       // **Delete only files inside uploads folder**
+//       if (fs.existsSync(filePath)) {
+//         fs.unlinkSync(filePath);
+//         console.log("✅ Local file deleted:", filePath);
+//       } else {
+//         console.warn("⚠️ Skipping deletion (file not found):", filePath);
+//       }
+
+//       // **Save details in MongoDB**
+//       const savedFile = await pdfModel.create({
+//         userId,
+//         fileName,
+//         fileUrl,
+//         summary,
+//       });
+
+//       uploadedFiles.push(savedFile);
+//     }
+
+//     res.status(200).json({
+//       message: "Files uploaded successfully",
+//       files: uploadedFiles,
+//     });
+//   } catch (error) {
+//     console.error("❌ Upload Error:", error.message);
+//     res.status(500).json({ error: error.message });
+//   } finally {
+//     cleanUploadsFolder();
+//   }
+// };
+
 const uploadFile = async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         status: false,
-        message: "No file uploaded",
+        message: "No files uploaded",
       });
     }
 
@@ -995,67 +1162,80 @@ const uploadFile = async (req, res) => {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    const fileName = `${Date.now()}_${req.file.originalname}`;
-    const filePath = path.join(uploadDir, fileName);
+    const uploadedFiles = [];
+    let combinedSummary = ""; // Variable to hold the combined summary of all PDFs
 
-    // **Save file locally using buffer**
-    fs.writeFileSync(filePath, req.file.buffer);
-    console.log("✅ File saved locally:", filePath);
+    // Loop through each file to process
+    for (const file of req.files) {
+      const fileName = `${Date.now()}_${file.originalname}`;
+      const filePath = path.join(uploadDir, fileName);
 
-    // **Extract text if PDF**
-    let summary = null;
-    if (req.file.mimetype === "application/pdf") {
-      try {
-        const extractedText = await extractTextFromPDF(req.file.buffer);
-        summary = await analyzeMedicalReport(extractedText);
-      } catch (pdfError) {
-        console.error("⚠️ PDF Processing Error:", pdfError.message);
+      // Save file locally using buffer
+      fs.writeFileSync(filePath, file.buffer);
+      console.log("✅ File saved locally:", filePath);
+
+      // Extract text if PDF
+      let summary = null;
+      if (file.mimetype === "application/pdf") {
+        try {
+          const extractedText = await extractTextFromPDF(file.buffer);
+          const fileSummary = await analyzeMedicalReport(extractedText);
+
+          // Append the individual summary to the combined summary
+          if (fileSummary) {
+            combinedSummary += fileSummary + "\n"; // Separate summaries with a newline
+          }
+        } catch (pdfError) {
+          console.error("⚠️ PDF Processing Error:", pdfError.message);
+        }
       }
+
+      // Upload file to AWS S3
+      const uploadParams = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: fileName,
+        Body: file.buffer, // Use buffer instead of readStream
+        ContentType: file.mimetype,
+      };
+
+      await s3.send(new PutObjectCommand(uploadParams));
+
+      const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+      console.log("✅ File uploaded to AWS:", fileUrl);
+
+      // Delete only files inside uploads folder
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log("✅ Local file deleted:", filePath);
+      } else {
+        console.warn("⚠️ Skipping deletion (file not found):", filePath);
+      }
+
+      // Add PDF data (file name, URL) to uploadedFiles
+      uploadedFiles.push({
+        fileName,
+        fileUrl,
+      });
     }
 
-    // **Upload file to AWS S3**
-    const uploadParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileName,
-      Body: req.file.buffer, // Use buffer instead of readStream
-      ContentType: req.file.mimetype,
-    };
-
-    await s3.send(new PutObjectCommand(uploadParams));
-
-    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-    console.log("✅ File uploaded to AWS:", fileUrl);
-
-    // **Delete only files inside uploads folder**
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("✅ Local file deleted:", filePath);
-    } else {
-      console.warn("⚠️ Skipping deletion (file not found):", filePath);
-    }
-
-    // **Save details in MongoDB**
-    await pdfModel.create({
+    // Save all PDF data and combined summary in MongoDB in a single document
+    const pdfDocument = await pdfModel.create({
       userId,
-      fileName,
-      fileUrl,
-      summary,
+      pdfs: uploadedFiles,
+      summary: combinedSummary.trim(), // Trim to remove any extra whitespace
     });
 
-    console.log("✅ File details saved in MongoDB.");
-
     res.status(200).json({
-      message: "File uploaded successfully",
-      fileUrl,
-      summary,
+      message: "Files uploaded successfully",
+      pdfDocument,
     });
   } catch (error) {
     console.error("❌ Upload Error:", error.message);
     res.status(500).json({ error: error.message });
-  } finally {
-    cleanUploadsFolder();
   }
 };
+
+
 
 const getAllUserReports = async (req, res) => {
   try {
