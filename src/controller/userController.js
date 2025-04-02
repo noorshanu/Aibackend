@@ -12,8 +12,6 @@ const { Readable } = require("stream");
 const { pipeline } = require("stream");
 const { PDFDocument } = require("pdf-lib");
 
-
-
 const { v4: uuidv4 } = require("uuid");
 const {
   S3Client,
@@ -980,86 +978,6 @@ const cleanUploadsFolder = () => {
     });
   });
 };
-// const uploadFile = async (req, res) => {
-//   try {
-//     if (!req.files) {
-//       return res.status(400).json({
-//         status: false,
-//         message: "No file uploaded",
-//       });
-//     }
-
-//     const userId = req.user?._id;
-//     if (!userId) return res.status(401).json({ error: "Unauthorized user" });
-
-//     // Ensure upload directory exists
-//     const uploadDir = path.join(__dirname, "../uploads");
-//     if (!fs.existsSync(uploadDir)) {
-//       fs.mkdirSync(uploadDir, { recursive: true });
-//     }
-
-//     const fileName = `${Date.now()}_${req.files.originalname}`;
-//     const filePath = path.join(uploadDir, fileName);
-
-//     // **Save file locally using buffer**
-//     fs.writeFileSync(filePath, req.files.buffer);
-//     console.log("✅ File saved locally:", filePath);
-
-//     // **Extract text if PDF**
-//     let summary = null;
-//     if (req.file.mimetype === "application/pdf") {
-//       try {
-//         const extractedText = await extractTextFromPDF(req.files.buffer);
-//         summary = await analyzeMedicalReport(extractedText);
-//       } catch (pdfError) {
-//         console.error("⚠️ PDF Processing Error:", pdfError.message);
-//       }
-//     }
-
-//     // **Upload file to AWS S3**
-//     const uploadParams = {
-//       Bucket: process.env.AWS_BUCKET_NAME,
-//       Key: fileName,
-//       Body: req.files.buffer, // Use buffer instead of readStream
-//       ContentType: req.file.mimetype,
-//     };
-
-//     await s3.send(new PutObjectCommand(uploadParams));
-
-//     const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-//     console.log("✅ File uploaded to AWS:", fileUrl);
-
-//     // **Delete only files inside uploads folder**
-//     if (fs.existsSync(filePath)) {
-//       fs.unlinkSync(filePath);
-//       console.log("✅ Local file deleted:", filePath);
-//     } else {
-//       console.warn("⚠️ Skipping deletion (file not found):", filePath);
-//     }
-
-//     // **Save details in MongoDB**
-//     await pdfModel.create({
-//       userId,
-//       fileName,
-//       fileUrl,
-//       summary,
-//     });
-
-//     console.log("✅ File details saved in MongoDB.");
-
-//     res.status(200).json({
-//       message: "File uploaded successfully",
-//       fileUrl,
-//       summary,
-//     });
-//   } catch (error) {
-//     console.error("❌ Upload Error:", error.message);
-//     res.status(500).json({ error: error.message });
-//   } finally {
-//     cleanUploadsFolder();
-//   }
-// };
-
 
 // const uploadFile = async (req, res) => {
 //   try {
@@ -1080,27 +998,34 @@ const cleanUploadsFolder = () => {
 //     }
 
 //     const uploadedFiles = [];
+//     let combinedSummary = ""; // Variable to hold the combined summary of all PDFs
 
+//     // Loop through each file to process
 //     for (const file of req.files) {
 //       const fileName = `${Date.now()}_${file.originalname}`;
 //       const filePath = path.join(uploadDir, fileName);
 
-//       // **Save file locally using buffer**
+//       // Save file locally using buffer
 //       fs.writeFileSync(filePath, file.buffer);
 //       console.log("✅ File saved locally:", filePath);
 
-//       // **Extract text if PDF**
+//       // Extract text if PDF
 //       let summary = null;
 //       if (file.mimetype === "application/pdf") {
 //         try {
 //           const extractedText = await extractTextFromPDF(file.buffer);
-//           summary = await analyzeMedicalReport(extractedText);
+//           const fileSummary = await analyzeMedicalReport(extractedText);
+
+//           // Append the individual summary to the combined summary
+//           if (fileSummary) {
+//             combinedSummary += fileSummary + "\n"; // Separate summaries with a newline
+//           }
 //         } catch (pdfError) {
 //           console.error("⚠️ PDF Processing Error:", pdfError.message);
 //         }
 //       }
 
-//       // **Upload file to AWS S3**
+//       // Upload file to AWS S3
 //       const uploadParams = {
 //         Bucket: process.env.AWS_BUCKET_NAME,
 //         Key: fileName,
@@ -1113,7 +1038,7 @@ const cleanUploadsFolder = () => {
 //       const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
 //       console.log("✅ File uploaded to AWS:", fileUrl);
 
-//       // **Delete only files inside uploads folder**
+//       // Delete only files inside uploads folder
 //       if (fs.existsSync(filePath)) {
 //         fs.unlinkSync(filePath);
 //         console.log("✅ Local file deleted:", filePath);
@@ -1121,20 +1046,23 @@ const cleanUploadsFolder = () => {
 //         console.warn("⚠️ Skipping deletion (file not found):", filePath);
 //       }
 
-//       // **Save details in MongoDB**
-//       const savedFile = await pdfModel.create({
-//         userId,
+//       // Add PDF data (file name, URL) to uploadedFiles
+//       uploadedFiles.push({
 //         fileName,
 //         fileUrl,
-//         summary,
 //       });
-
-//       uploadedFiles.push(savedFile);
 //     }
+
+//     // Save all PDF data and combined summary in MongoDB in a single document
+//     const pdfDocument = await pdfModel.create({
+//       userId,
+//       pdfs: uploadedFiles,
+//       summary: combinedSummary.trim(), // Trim to remove any extra whitespace
+//     });
 
 //     res.status(200).json({
 //       message: "Files uploaded successfully",
-//       files: uploadedFiles,
+//       pdfDocument,
 //     });
 //   } catch (error) {
 //     console.error("❌ Upload Error:", error.message);
@@ -1143,7 +1071,6 @@ const cleanUploadsFolder = () => {
 //     cleanUploadsFolder();
 //   }
 // };
-
 const uploadFile = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -1156,73 +1083,56 @@ const uploadFile = async (req, res) => {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ error: "Unauthorized user" });
 
-    // Ensure upload directory exists
     const uploadDir = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
     const uploadedFiles = [];
-    let combinedSummary = ""; // Variable to hold the combined summary of all PDFs
+    let combinedText = ""; // Stores all extracted text from PDFs
 
-    // Loop through each file to process
     for (const file of req.files) {
       const fileName = `${Date.now()}_${file.originalname}`;
       const filePath = path.join(uploadDir, fileName);
 
-      // Save file locally using buffer
+      // Save file locally
       fs.writeFileSync(filePath, file.buffer);
-      console.log("✅ File saved locally:", filePath);
 
       // Extract text if PDF
-      let summary = null;
       if (file.mimetype === "application/pdf") {
         try {
           const extractedText = await extractTextFromPDF(file.buffer);
-          const fileSummary = await analyzeMedicalReport(extractedText);
-
-          // Append the individual summary to the combined summary
-          if (fileSummary) {
-            combinedSummary += fileSummary + "\n"; // Separate summaries with a newline
-          }
+          combinedText += extractedText + "\n\n"; // Append extracted text
         } catch (pdfError) {
           console.error("⚠️ PDF Processing Error:", pdfError.message);
         }
       }
 
-      // Upload file to AWS S3
+      // Upload to S3
       const uploadParams = {
         Bucket: process.env.AWS_BUCKET_NAME,
         Key: fileName,
-        Body: file.buffer, // Use buffer instead of readStream
+        Body: file.buffer,
         ContentType: file.mimetype,
       };
-
       await s3.send(new PutObjectCommand(uploadParams));
 
       const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-      console.log("✅ File uploaded to AWS:", fileUrl);
+      uploadedFiles.push({ fileName, fileUrl });
 
-      // Delete only files inside uploads folder
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log("✅ Local file deleted:", filePath);
-      } else {
-        console.warn("⚠️ Skipping deletion (file not found):", filePath);
-      }
-
-      // Add PDF data (file name, URL) to uploadedFiles
-      uploadedFiles.push({
-        fileName,
-        fileUrl,
-      });
+      // Delete local file
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    // Save all PDF data and combined summary in MongoDB in a single document
+    // Analyze the combined medical report text to generate a single final summary
+    let finalSummary = "";
+    if (combinedText.trim()) {
+      finalSummary = await analyzeMedicalReport(combinedText);
+    }
+
+    // Save to MongoDB as a single document
     const pdfDocument = await pdfModel.create({
       userId,
       pdfs: uploadedFiles,
-      summary: combinedSummary.trim(), // Trim to remove any extra whitespace
+      summary: finalSummary.trim(),
     });
 
     res.status(200).json({
@@ -1232,10 +1142,10 @@ const uploadFile = async (req, res) => {
   } catch (error) {
     console.error("❌ Upload Error:", error.message);
     res.status(500).json({ error: error.message });
+  } finally {
+    cleanUploadsFolder();
   }
 };
-
-
 
 const getAllUserReports = async (req, res) => {
   try {
@@ -1634,7 +1544,54 @@ const removeProfilePicture = async (req, res) => {
   }
 };
 
-const deleteUserReport = async (req, res) => {
+const deleteUserReportFile = async (req, res) => {
+  try {
+    const userIdFromToken = req.user?.user_id;
+    const { reportId, filename } = req.params;
+
+    if (!userIdFromToken) {
+      return res.status(401).json({ error: "Unauthorized user" });
+    }
+
+    // Ensure reportId is a valid ObjectId
+    const report = await pdfModel.findOne({
+      _id: new mongoose.Types.ObjectId(reportId),
+      userId: userIdFromToken,
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ error: "Report not found or unauthorized" });
+    }
+
+    console.log("✅ Report found:", report);
+
+    const fileIndex = report.pdfs.findIndex(
+      (file) => file.fileName === filename
+    );
+    if (fileIndex === -1) {
+      return res
+        .status(400)
+        .json({ status: false, msg: "File is not available for deletion" });
+    }
+
+    // Delete from AWS S3
+    const deleteParams = { Bucket: process.env.AWS_BUCKET_NAME, Key: filename };
+    await s3.send(new DeleteObjectCommand(deleteParams));
+
+    // Remove from MongoDB
+    report.pdfs.splice(fileIndex, 1);
+    await report.save();
+
+    res.status(200).json({ message: "File deleted successfully" });
+  } catch (error) {
+    console.error("❌ Delete Error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const deleteUserpdf = async (req, res) => {
   try {
     const userIdFromToken = req.user?.user_id; // Extract user ID from token
     const { reportId } = req.params; // Get report ID from request params
@@ -1648,29 +1605,34 @@ const deleteUserReport = async (req, res) => {
       _id: reportId,
       userId: userIdFromToken,
     });
+
     if (!report) {
       return res
         .status(404)
         .json({ error: "Report not found or unauthorized" });
     }
 
-    const fileKey = report.fileName; // Extract file name (AWS S3 key)
+    // **Step 1: Delete all files from AWS S3**
+    const deleteFilePromises = report.pdfs.map((file) => {
+      const deleteParams = {
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: file.fileName, // Extract file name from stored data
+      };
+      return s3.send(new DeleteObjectCommand(deleteParams));
+    });
 
-    // **Step 1: Delete file from AWS S3**
-    const deleteParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileKey,
-    };
-
-    await s3.send(new DeleteObjectCommand(deleteParams));
-    console.log("✅ File deleted from AWS:", fileKey);
+    // Wait for all files to be deleted from AWS
+    await Promise.all(deleteFilePromises);
+    console.log("✅ All files deleted from AWS S3");
 
     // **Step 2: Delete report from MongoDB**
     await pdfModel.deleteOne({ _id: reportId });
 
     console.log("✅ Report deleted from MongoDB.");
 
-    res.status(200).json({ message: "Report deleted successfully" });
+    res.status(200).json({
+      message: "Report and all associated files deleted successfully",
+    });
   } catch (error) {
     console.error("❌ Delete Error:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
@@ -1694,5 +1656,6 @@ module.exports = {
   removeProfilePicture,
   downloadUserReport,
   getAllUserReports,
-  deleteUserReport,
+  deleteUserpdf,
+  deleteUserReportFile,
 };

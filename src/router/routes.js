@@ -19,7 +19,8 @@ const {
   uploadProfilePicture,
   removeProfilePicture,
   downloadUserReport,
-  deleteUserReport,
+  deleteUserpdf,
+  deleteUserReportFile
 } = require("../controller/userController"); // Use require() instead of just referencing the path
 const {
   authenticate,
@@ -47,9 +48,14 @@ router.post(
 router.get("/reports", authenticateUser, getAllUserReports);
 router.get("/DawnloadReports/:fileName", authenticateUser, downloadUserReport);
 router.delete(
-  "/deleteUserReport/:reportId",
+  "/deleteUserPdf/:reportId",
   authenticateUser,
-  deleteUserReport
+  deleteUserpdf
+);
+router.delete(
+  "/deleteUserReportFile/:reportId/:filename",
+  authenticateUser,
+  deleteUserReportFile
 );
 router.post("/AskQuestion", authenticate, AskQuestion);
 router.post("/userContact", userContact);
